@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<article class="main supporting">
+    <h3>Manage Users</h3>
+    <table id="usersTable" class="display">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last Logged In</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr data-id="{{ user.id }}" data-username="{{ user.username }}" data-email="{{ user.email }}" data-role="{{ user.role }}" data-status="{{ user.status }}">
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.role }}</td>
+                <td class="status-column">
+                    {% if user.status == 'Active' %}
+                    <span title="Active">🟢</span>
+                    {% elif user.status == 'Inactive' %}
+                    <span title="Inactive">🟡</span>
+                    {% elif user.status == 'Unverified' %}
+                    <span title="Unverified">🔵</span>
+                    {% elif user.status == 'Banned' %}
+                    <span title="Banned">⚫</span>
+                    {% endif %}
+                </td>
+                <td>{{ user.last_logged_in|time_ago }}</td>
+                <td>
+                    <button class="edit-user">✏️</button>
+                    {% if user.status == 'Banned' %}
+                    <button class="unban-user">🔓</button>
+                    {% else %}
+                    <button class="ban-user">🔒</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</article>
+
+<!-- Include jQuery and DataTables libraries -->
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
+<script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
+
+<script>
+$(document).ready(function() {
+    var table = $('#usersTable').DataTable({
+        paging: false,
+        info: false,
+        responsive: true
+    });
+
+    $('#usersTable tbody').on('click', 'tr', function() {
+        if ($(this).hasClass('selected')) {
+            $(this).removeClass('selected');
+        } else {
+            table.$('tr.selected').removeClass('selected');
+            $(this).addClass('selected');
+        }
+    });
+
+    $('.edit-user').on('click', function() {
+        var tr = $(this).closest('tr');
+        var userId = tr.data('id');
+        var username = tr.data('username');
+        var email = tr.data('email');
+        var role = tr.data('role');
+        var status = tr.data('status');
+
+        var roleOptions = `
+            {% for role in roles %}
+            <option value="{{ role.id }}" ${role.role_name == role ? 'selected' : ''}>{{ role.role_name }}</option>
+            {% endfor %}
+        `;
+
+        var statusOptions = `
+            <option value="Active" ${status == 'Active' ? 'selected' : ''}>Active</option>
+            <option value="Inactive" ${status == 'Inactive' ? 'selected' : ''}>Inactive</option>
+            <option value="Unverified" ${status == 'Unverified' ? 'selected' : ''}>Unverified</option>
+            <option value="Banned" ${status == 'Banned' ? 'selected' : ''}>Banned</option>
+        `;
+
+        var formHtml = `
+            <form id="editUserForm">
+                <input type="hidden" name="user_id" value="${userId}">
+                <label for="username">Username:</label>
+                <input type="text" name="username" value="${username}" disabled>
+                <label for="email">Email:</label>
+                <input type="email" name="email" value="${email}">
+                <label for="role">Role:</label>
+                <select name="role_id">${roleOptions}</select>
+                <label for="status">Status:</label>
+                <select name="status">${statusOptions}</select>
+                <label for="password">Reset Password:</label>
+                <input type="password" name="password">
+                <button type="submit">Update User</button>
+            </form>
+        `;
+
+        $('#userModal .modal-body').html(formHtml);
+        $('#userModal').modal('show');
+
+        $('#editUserForm').on('submit', function(e) {
+            e.preventDefault();
+            $.ajax({
+                url: '{{ url_for("admin.update_user") }}',
+                type: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    if (response.status == 'success') {
+                        tr.find('td:nth-child(3)').text($('input[name="email"]').val());
+                        tr.find('td:nth-child(4)').text($('select[name="role_id"] option:selected').text());
+                        var statusIcon = '';
+                        switch ($('select[name="status"]').val()) {
+                            case 'Active':
+                                statusIcon = '🟢';
+                                break;
+                            case 'Inactive':
+                                statusIcon = '🟡';
+                                break;
+                            case 'Unverified':
+                                statusIcon = '🔵';
+                                break;
+                            case 'Banned':
+                                statusIcon = '⚫';
+                                break;
+                        }
+                        tr.find('td:nth-child(5)').html(`<span title="${$('select[name="status"] option:selected').text()}">${statusIcon}</span>`);
+                        $('#userModal').modal('hide');
+                    } else {
+                        alert(response.message);
+                    }
+                }
+            });
+        });
+    });
+
+    $('.ban-user').on('click', function() {
+        var tr = $(this).closest('tr');
+        var userId = tr.data('id');
+        var username = tr.data('username');
+
+        if (confirm(`Are you sure you want to ban the user "${username}"?`)) {
+            $.ajax({
+                url: '{{ url_for("admin.ban_user") }}',
+                type: 'POST',
+                data: { user_id: userId },
+                success: function(response) {
+                    if (response.status == 'success') {
+                        tr.find('td:nth-child(5)').html('<span title="Banned">⚫</span>');
+                        tr.find('td:nth-child(7)').html('<button class="edit-user">✏️</button><button class="unban-user">🔓</button>');
+                        alert('User has been banned.');
+                    } else {
+                        alert(response.message);
+                    }
+                }
+            });
+        }
+    });
+
+    $('#usersTable').on('click', '.unban-user', function() {
+        var tr = $(this).closest('tr');
+        var userId = tr.data('id');
+        var username = tr.data('username');
+
+        if (confirm(`Are you sure you want to unban the user "${username}"?`)) {
+            $.ajax({
+                url: '{{ url_for("admin.unban_user") }}',
+                type: 'POST',
+                data: { user_id: userId },
+                success: function(response) {
+                    if (response.status == 'success') {
+                        tr.find('td:nth-child(5)').html('<span title="Active">🟢</span>');
+                        tr.find('td:nth-child(7)').html('<button class="edit-user">✏️</button><button class="ban-user">🔒</button>');
+                        alert('User has been unbanned.');
+                    } else {
+                        alert(response.message);
+                    }
+                }
+            });
+        }
+    });
+});
+</script>
+
+<!-- User Edit Modal -->
+<div class="modal" id="userModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+        <br>
+      <div class="modal-body">
+        <!-- Form will be injected here by jQuery -->
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

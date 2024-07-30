@@ -1,0 +1,8 @@
+.selected {
+    background-color: #d1e7dd !important;
+}
+
+.status-column {
+    text-align: center;
+    vertical-align: middle;
+}

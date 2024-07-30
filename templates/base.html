@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>{{ config.SITE_NAME }}</title>
+</head>
+<body id="site-name">
+
+    <div class="page-wrapper">
+        <header role="banner">
+            <div class="intro" role="article">
+                <h1>{{ config.SITE_NAME }}</h1>
+                <h2>Header</h2>
+            </div>
+
+            <div class="supporting" role="article">
+                <p>Description</p>
+            </div>
+
+            <div class="participation" role="article">
+                <h3>Header</h3>
+                <p>Description</p>
+            </div>
+        </header>
+
+        <nav role="navigation">
+            <ul>
+                <li><a href="{{ url_for('main.index') }}">Home</a></li>
+                {% if g.user %}
+                    <li><a href="{{ url_for('main.profile') }}">Your Account</a></li>
+                    {% if g.user['username'] == config.ADMIN_LOGIN %}
+                        <li><a href="{{ url_for('admin.manage_users') }}">Manage Users</a></li>
+                        <li><a href="{{ url_for('admin.manage_site') }}">Manage Site</a></li>
+                        <li><a href="{{ url_for('admin.manage_database') }}">Manage Database</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('auth.login') }}">Login</a></li>
+                    <li><a href="{{ url_for('auth.register') }}">Sign Up</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+
+        <main role="main" class="main-content">
+            {% block content %}
+            {% endblock %}
+        </main>
+
+        <footer role="contentinfo">
+            <div class="legal">
+                <p>© 2024 {{ config.SITE_NAME }}. All Rights Reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+</body>
+</html>
