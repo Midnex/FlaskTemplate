@@ -5,12 +5,12 @@ from getpass import getpass
 def create_env_file():
     print("Creating .env file for the first-time setup.")
 
-    admin_username = input("Enter admin username: ")
-    admin_password = getpass("Enter admin password: ")
-    admin_email = input("Enter admin email: ")
-    database_name = input("Enter database name (e.g., database.db): ")
+    admin_username = input("Enter admin username (default: admin): ") or "admin"
+    admin_password = getpass("Enter admin password (default: password): ") or "password"
+    admin_email = input("Enter admin email: ") or "admin@site.com"
+    database_name = input("Enter database name (default: database.db): ") or "database.db"
     site_name = input("Enter site name: ")
-    debug_mode = input("Enter debug mode (True/False): ")
+    debug_mode = input("Enter debug mode (default: True): ") or True
     ip_bind = input("Enter IP to bind to (default: 0.0.0.0): ") or "0.0.0.0"
     port = input("Enter port to bind to (default: 5000): ") or "5000"
 
