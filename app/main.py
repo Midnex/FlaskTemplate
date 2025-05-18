@@ -1,13 +1,21 @@
-from flask import Blueprint, render_template, g, request, flash, redirect, url_for, send_from_directory, current_app
-from werkzeug.security import generate_password_hash
-from app.auth import login_required
-from app.db import get_db
 import re
+import os
+
+from app.decorators import login_required
+from app.models import db, User
+from flask import Blueprint, g, redirect, render_template, request, url_for, current_app
+from werkzeug.security import generate_password_hash
 
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
 def index():
+    template_path = current_app.template_folder
+
+    if os.path.exists(template_path):
+        print("Templates directory contents:", os.listdir(template_path))
+    else:
+        print("Template folder not found:", template_path)
     return render_template('index.html')
 
 @bp.route('/profile', methods=('GET', 'POST'))
@@ -17,56 +25,33 @@ def profile():
         email = request.form['email']
         password = request.form['password']
         confirm_password = request.form['confirm_password']
-        db = get_db()
         error = None
 
         if not email:
             error = 'Email is required.'
-        elif not validate_email(email):
+        elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
             error = 'Invalid email address.'
-        elif db.execute(
-            'SELECT id FROM user WHERE email = ? AND id != ?', (email, g.user['id'])
-        ).fetchone() is not None:
-            error = f'Email {email} is already registered.'
+        elif password and password != confirm_password:
+            error = 'Passwords do not match.'
+        elif password and len(password) < 8:
+            error = 'Password must be at least 8 characters long.'
 
-        if not error and password:
-            if password != confirm_password:
-                error = 'Passwords do not match.'
-            elif not validate_password(password):
-                error = 'Password does not meet the requirements.'
-            else:
-                db.execute(
-                    'UPDATE user SET password = ? WHERE id = ?',
-                    (generate_password_hash(password), g.user['id'])
-                )
-
-        if not error:
-            db.execute(
-                'UPDATE user SET email = ? WHERE id = ?',
-                (email, g.user['id'])
-            )
-            db.commit()
-            flash('Profile updated successfully.')
+        if error is None:
+            user = g.user
+            user.email = email
+            if password:
+                user.password = generate_password_hash(password)
+            db.session.commit()
+            return redirect(url_for('main.profile'))
         else:
-            flash(error)
+            return render_template('profile.html', email=email, error=error)
 
-    return render_template('profile.html', email=g.user['email'])
+    return render_template('profile.html', email=g.user.email)
 
 @bp.route('/main')
 @login_required
 def main_page():
-    return render_template('main.html', username=g.user['username'])
-
-def validate_password(password):
-    if (len(password) < 16 or
-        not re.search(r"\d", password) or
-        not re.search(r"[A-Z]", password) or
-        not re.search(r"[!@#$%^&*(),.?\":{}|<>-]", password)):
-        return False
-    return True
-
-def validate_email(email):
-    return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
+    return render_template('main.html', username=g.user.username)
 
 @bp.route('/static/<path:filename>')
 def custom_static(filename):

@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, g, redirect, url_for
-from app.auth import login_required, admin_required
-from app.db import get_db
-from werkzeug.security import generate_password_hash
 import re
+
+from app.auth import admin_required, login_required
+from app.models import db, User, Role
+from flask import Blueprint, jsonify, render_template, request
+from werkzeug.security import generate_password_hash
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -10,13 +11,10 @@ bp = Blueprint('admin', __name__, url_prefix='/admin')
 @login_required
 @admin_required
 def manage_users():
-    db = get_db()
-    users = db.execute('''
-        SELECT user.id, user.username, user.email, roles.role_name as role, user.status, user.last_logged_in
-        FROM user
-        JOIN roles ON user.role = roles.id
-    ''').fetchall()
-    roles = db.execute('SELECT id, role_name FROM roles').fetchall()
+    users = User.query.join(Role, User.role_id == Role.id).add_columns(
+        User.id, User.username, User.email, Role.name.label('role'), User.status, User.last_logged_in
+    ).all()
+    roles = Role.query.all()
     return render_template('admin/manage_users.html', users=users, roles=roles)
 
 @bp.route('/manage_site')
@@ -41,27 +39,23 @@ def update_user():
     status = request.form['status']
     password = request.form.get('password')
 
-    db = get_db()
+    user = User.query.get(user_id)
     error = None
 
     if not email:
         error = 'Email is required.'
-    elif not validate_email(email):
+    elif not re.match(r'[^@]+@[^@]+\.[^@]+', email):
         error = 'Invalid email address.'
-    elif password and not validate_password(password):
-        error = 'Password does not meet the requirements.'
+    elif password and len(password) < 8:
+        error = 'Password must be at least 8 characters long.'
 
     if error is None:
-        db.execute(
-            'UPDATE user SET email = ?, role = ?, status = ? WHERE id = ?',
-            (email, role_id, status, user_id)
-        )
+        user.email = email
+        user.role_id = role_id
+        user.status = status
         if password:
-            db.execute(
-                'UPDATE user SET password = ? WHERE id = ?',
-                (generate_password_hash(password), user_id)
-            )
-        db.commit()
+            user.password = generate_password_hash(password)
+        db.session.commit()
         return jsonify({'status': 'success'})
     else:
         return jsonify({'status': 'error', 'message': error})
@@ -71,12 +65,9 @@ def update_user():
 @admin_required
 def ban_user():
     user_id = request.form['user_id']
-    db = get_db()
-    db.execute(
-        'UPDATE user SET status = ? WHERE id = ?',
-        ('Banned', user_id)
-    )
-    db.commit()
+    user = User.query.get(user_id)
+    user.status = 'Banned'
+    db.session.commit()
     return jsonify({'status': 'success'})
 
 @bp.route('/unban_user', methods=['POST'])
@@ -84,21 +75,7 @@ def ban_user():
 @admin_required
 def unban_user():
     user_id = request.form['user_id']
-    db = get_db()
-    db.execute(
-        'UPDATE user SET status = ? WHERE id = ?',
-        ('Active', user_id)
-    )
-    db.commit()
+    user = User.query.get(user_id)
+    user.status = 'Active'
+    db.session.commit()
     return jsonify({'status': 'success'})
-
-def validate_email(email):
-    return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
-
-def validate_password(password):
-    if (len(password) < 16 or
-        not re.search(r"\d", password) or
-        not re.search(r"[A-Z]", password) or
-        not re.search(r"[!@#$%^&*(),.?\":{}|<>-]", password)):
-        return False
-    return True
