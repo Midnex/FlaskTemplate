@@ -30,9 +30,8 @@ def create_env_file():
 
     load_dotenv(override=True)
 
-def check_database():
+def check_database(app):
     load_dotenv(override=True)
-    app = create_app()
     with app.app_context():
         database_path = Config.SQLALCHEMY_DATABASE_URI.replace("sqlite:///", "")
         print(f"Loaded database path from config: {database_path}")
@@ -89,4 +88,8 @@ def initialize_database(app):
 if __name__ == "__main__":
     if not os.path.exists(".env"):
         create_env_file()
-    check_database()
+        
+    load_dotenv(override=True)
+
+    app = create_app()
+    check_database(app)
