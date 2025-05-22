@@ -92,4 +92,6 @@ if __name__ == "__main__":
     load_dotenv(override=True)
 
     app = create_app()
+    app.config.from_prefixed_env()
     check_database(app)
+    
