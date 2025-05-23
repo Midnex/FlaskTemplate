@@ -1,10 +1,10 @@
 import functools
-import re
 
-from app.models import User, db
 from flask import (Blueprint, flash, g, redirect, render_template, request,
                    session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from app.models import db, Users, Roles
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -28,16 +28,21 @@ def register():
             error = 'Passwords do not match.'
         elif len(password) < 8:
             error = 'Password must be at least 8 characters long.'
-        elif User.query.filter_by(username=username).first():
+        elif Users.query.filter_by(username=username).first():
             error = f'User {username} is already registered.'
-        elif User.query.filter_by(email=email).first():
+        elif Users.query.filter_by(email=email).first():
             error = f'Email {email} is already registered.'
 
         if error is None:
-            user = User(username=username, email=email, password=generate_password_hash(password))
-            db.session.add(user)
-            db.session.commit()
-            return redirect(url_for('auth.login'))
+            user_role = Roles.query.filter_by(role_name='user').first()
+            if not user_role:
+                error = "Default user role not found. Please contact an administrator."
+                flash(error)
+            else:
+                user = Users(username=username, email=email, password=password, role_id=user_role.id)
+                db.session.add(user)
+                db.session.commit()
+                return redirect(url_for('auth.login'))
 
         flash(error)
 
@@ -50,7 +55,7 @@ def login():
         password = request.form['password']
 
         error = None
-        user = User.query.filter_by(username=username).first()
+        user = Users.query.filter_by(username=username).first()
 
         if user is None:
             error = 'Incorrect username.'
@@ -78,8 +83,8 @@ def account_settings():
 
         if password and password != confirm_password:
             error = 'Passwords do not match.'
-        elif password and len(password) < 8:
-            error = 'Password must be at least 8 characters long.'
+        elif password and len(password) < 16:
+            error = 'Password must be at least 16 characters long.'
 
         if error is None:
             user = g.user
@@ -99,7 +104,7 @@ def load_logged_in_user():
     if user_id is None:
         g.user = None
     else:
-        g.user = User.query.get(user_id)
+        g.user = Users.query.get(user_id)
 
 @bp.route('/logout')
 def logout():

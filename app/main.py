@@ -1,10 +1,13 @@
-import re
 import os
+import re
+
+from flask import (Blueprint, current_app, g, redirect, render_template,
+                   request, url_for, send_from_directory)
+from werkzeug.security import generate_password_hash
 
 from app.decorators import login_required
-from app.models import db, User
-from flask import Blueprint, g, redirect, render_template, request, url_for, current_app
-from werkzeug.security import generate_password_hash
+from app.models import db
+
 
 bp = Blueprint('main', __name__)
 
@@ -54,5 +57,6 @@ def main_page():
     return render_template('main.html', username=g.user.username)
 
 @bp.route('/static/<path:filename>')
+@login_required
 def custom_static(filename):
     return send_from_directory(current_app.config['STATIC_FOLDER'], filename)

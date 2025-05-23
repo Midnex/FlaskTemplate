@@ -1,9 +1,10 @@
 import re
 
-from app.auth import admin_required, login_required
-from app.models import db, User, Role
 from flask import Blueprint, jsonify, render_template, request
 from werkzeug.security import generate_password_hash
+
+from app.auth import admin_required, login_required
+from app.models import db, Users, Roles
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -11,10 +12,10 @@ bp = Blueprint('admin', __name__, url_prefix='/admin')
 @login_required
 @admin_required
 def manage_users():
-    users = User.query.join(Role, User.role_id == Role.id).add_columns(
-        User.id, User.username, User.email, Role.name.label('role'), User.status, User.last_logged_in
+    users = Users.query.join(Roles, Users.role_id == Roles.id).add_columns(
+        Users.id, Users.username, Users.email, Roles.role_name.label('role'), Users.status, Users.last_logged_in
     ).all()
-    roles = Role.query.all()
+    roles = Roles.query.all()
     return render_template('admin/manage_users.html', users=users, roles=roles)
 
 @bp.route('/manage_site')
@@ -39,7 +40,7 @@ def update_user():
     status = request.form['status']
     password = request.form.get('password')
 
-    user = User.query.get(user_id)
+    users = Users.query.get(user_id)
     error = None
 
     if not email:
@@ -50,11 +51,11 @@ def update_user():
         error = 'Password must be at least 8 characters long.'
 
     if error is None:
-        user.email = email
-        user.role_id = role_id
-        user.status = status
+        users.email = email
+        users.role_id = role_id
+        users.status = status
         if password:
-            user.password = generate_password_hash(password)
+            users.password = generate_password_hash(password)
         db.session.commit()
         return jsonify({'status': 'success'})
     else:
@@ -64,9 +65,9 @@ def update_user():
 @login_required
 @admin_required
 def ban_user():
-    user_id = request.form['user_id']
-    user = User.query.get(user_id)
-    user.status = 'Banned'
+    users_id = request.form['user_id']
+    users = Users.query.get(users_id)
+    users.status = 'Banned'
     db.session.commit()
     return jsonify({'status': 'success'})
 
@@ -74,8 +75,8 @@ def ban_user():
 @login_required
 @admin_required
 def unban_user():
-    user_id = request.form['user_id']
-    user = User.query.get(user_id)
-    user.status = 'Active'
+    users_id = request.form['user_id']
+    users = Users.query.get(users_id)
+    users.status = 'Active'
     db.session.commit()
     return jsonify({'status': 'success'})
